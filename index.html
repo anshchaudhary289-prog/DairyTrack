@@ -9,6 +9,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="DairyTrack">
 <title>DairyTrack — Har Grahak Ka Apna Rate</title>
+<link rel="manifest" href="manifest.json">
+
+<!-- Firebase SDK (compat - classic code toote na) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -124,12 +130,27 @@
   <div class="wrap hdr">
     <button class="backbtn" id="backBtn" aria-label="Peeche">←</button>
     <div>
-      <h1>🥛 <span id="shopNameHdr">DairyTrack</span></h1>
+      <h1>🥛 <span id="shopNameHdr">DairyTrack</span></span></h1>
+      <div id="syncStatus" style="font-size:.75rem;color:#666;margin-top:4px">☐ Sab sync hai</div>
       <div class="sub" id="hdrSub">Bhains ka doodh • Litre me hisab</div>
     </div>
     <div class="demotag">v3</div>
   </div>
 </header>
+
+<!-- LOGIN SCREEN -->
+<div id="scr-login" class="screen on" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1c1917">
+  <div style="background:#fff8e7;padding:32px 48px;border-radius:16px;text-align:center;width:90%;max-width:360px">
+    <div style="font-size:3rem;margin-bottom:8px;">🥛</div>
+    <h1 style="margin:8px 0;color:#111111;">DairyTrack</h1>
+    <div style="color:#44403c;font-size:.9rem;margin-bottom:32px;">Apna hisab-kitab sambhalen</div>
+    <button id="googleLoginBtn" style="width:100%;background:#15803d;color:#ffffff;padding:16px;border:none;border-radius:12px;font-size:1.1rem;font-weight:800;cursor:pointer">
+      Google se Login Karo
+    </button>
+    <div id="loginError" style="margin-top:16px;color:#b91c1c;display:none;font-size:.9rem"></div>
+    <button id="logoutBtn" style="margin-top:24px;width:100%;background:#ffffff;color:#111111;padding:16px;border:2px solid #cfc39f;border-radius:12px;font-size:.9rem;display:none" onclick="doLogout()">🚪 Logout</button>
+  </div>
+</div>
 
 <div class="wrap">
 
@@ -260,6 +281,22 @@ var LS_KEY = "doodhHisabV3";
 var state = null;
 var curRound = "m";
 var formRound = "m";
+
+// Firebase initialization
+const firebaseConfig = {
+  apiKey: "AIzaSyC3mnL0vyuaW_8MO6Q62AzlotZbY3bk3wA",
+  authDomain: "dairytrack-98a24.firebaseapp.com",
+  projectId: "dairytrack-98a24",
+  storageBucket: "dairytrack-98a24.firebasestorage.app",
+  messagingSenderId: "541028339102",
+  appId: "1:541028339102:web:1f2f44731719f48e349a8f"
+};
+firebase.initializeApp(firebaseConfig);
+firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+try {
+  firebase.firestore().enablePersistence({ synchronizeTabs: true })
+    .catch(() => {/* offline chalega, phir sync hoga */}});
+} catch (e) {/* Firestore persistence already set ya error */ }
 
 function uid(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function pad(n){ return (n<10?"0":"")+n; }
@@ -635,6 +672,168 @@ if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
     navigator.serviceWorker.register('service-worker.js').catch(function(){});
   });
 }
+
+// Auth state change listener
+var authUnsubscribe = firebase.auth().onAuthStateChanged(function(user) {
+  var loginScreen = document.getElementById('scr-login');
+  var loginError = document.getElementById('loginError');
+  var logoutBtn = document.getElementById('logoutBtn');
+  var mainContent = document.querySelector('.wrap');
+  
+  if (!user) {
+    // User not logged in - show only login screen, hide main app
+    loginScreen.style.display = 'flex';
+    loginError.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    main.style.display = 'none';
+    // Remove any existing app navigation
+    document.querySelectorAll('.screen:not(#scr-login)').forEach(function(s) { s.style.display = 'none'; });
+  } else {
+    // User logged in - check email
+    if (user.email !== 'ansh.spare.01@gmail.com') {
+      // Wrong account
+      loginError.style.display = 'block';
+      loginError.textContent = 'Ye account dairy wala nahi hai';
+      loginScreen.style.display = 'flex';
+      logoutBtn.style.display = 'none';
+      main.style.display = 'none';
+    } else {
+      // Correct account - show app
+      loginScreen.style.display = 'none';
+      logoutBtn.style.display = 'block';
+      main.style.display = 'block';
+      // Initialize app - render home, etc.
+      renderHome();
+      // Setup sync after login
+      setupSync(user);
+    }
+  }
+});
+// Sync Setup Function
+function setupSync(user) {
+  var syncStatus = document.getElementById('syncStatus');
+  // Remove old onSnapshot if exists
+  if (window.syncUnsubscribe) { window.syncUnsubscribe(); window.syncUnsubscribe = null; }
+  
+  window.syncUnsubscribe = firebase.firestore().collection('hisab').doc('main').onSnapshot(function(doc) {
+    if (!doc.exists) {
+      // First time - push local data to remote
+      persistToFirestore();
+      return;
+    }
+    var remoteState = doc.data().state;
+    var remoteUpdatedAt = doc.data().updatedAt;
+    var remoteUpdatedBy = doc.data().updatedBy;
+    
+    // Update localStorage from remote
+    state = remoteState;
+    persist();
+    
+    // Update sync status
+    var now = new Date();
+    var diffMinutes = (now - remoteUpdatedAt.toMillis) / 60000;
+    
+    if (doc.metadata.hasPendingWrites) {
+      syncStatus.textContent = '⏳ Bhej raha hai...';
+      syncStatus.className = 'sync-status offline';
+    } else if (remoteUpdatedAt.toMillis < now - 300000) { // 5 min se purana
+      syncStatus.textContent = '📴 Offline — hisab phone me safe hai, net aate hi sync hoga';
+      syncStatus.className = 'sync-status offline';
+    } else {
+      syncStatus.textContent = '☐ Sab sync hai';
+      syncStatus.className = 'sync-status online';
+    }
+    
+    // Re-render current screen
+    if (window.go) go('home');
+  }, function(error) {
+    console.error('Sync error: ', error);
+    if (syncStatus) {
+      syncStatus.textContent = '⚠ Sync error';
+      syncStatus.className = 'sync-status error';
+    }
+  });
+}
+
+function persistToFirestore() {
+  if (!state) return;
+  var email = firebase.auth().currentUser?.email || '';
+  var docRef = firebase.firestore().collection('hisab').doc('main');
+  docRef.set({
+    state: state,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: email
+  }, { merge: false })
+    .then(function() {
+      // Success
+    })
+    .catch(function(error) {
+      console.error('Firestore write error: ', error);
+    });
+}
+
+// Debounced write to Firestore (1 second)
+var syncDebounceTimer = null;
+function debouncedPersistToFirestore() {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(function() {
+    persistToFirestore();
+  }, 1000);
+}
+
+// Override the original persist() to also write to Firestore when logged in
+var originalPersist = persist;
+function persist() {
+  originalPersist();
+  var user = firebase.auth().currentUser;
+  if (user) {
+    debouncedPersistToFirestore();
+  }
+});
+});
+
+// Logout Function
+function doLogout() {
+  // Two-tap confirm pattern (not browser confirm)
+  var logoutBtn = document.getElementById('logoutBtn');
+  logoutBtn.textContent = 'Pakka khatao?';
+  logoutBtn.style.background = '#fef2f2';
+  logoutBtn.style.color = '#b91c1c';
+  
+  setTimeout(function() {
+    logoutBtn.textContent = '🚪 Logout';
+    logoutBtn.style.background = '#ffffff';
+    logoutBtn.style.color = '#111111';
+  }, 3000);
+  
+  setTimeout(function() {
+    firebase.auth().signOut().then(function() {
+      // Sign-out successful, onAuthStateChanged will handle UI
+    }).catch(function(error) {
+      console.error('Sign-out error: ', error);
+    });
+  }, 3000);
+}
+
+// Google Login Button Click
+document.getElementById('googleLoginBtn').addEventListener('click', function() {
+  var loginError = document.getElementById('loginError');
+  loginError.style.display = 'none';
+  
+  // Try signInWithPopup first
+  var provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider).then(function(result) {
+    // Login successful - onAuthStateChanged will handle the rest
+  }).catch(function(error) {
+    // Popup blocked or failed - try redirect
+    firebase.auth().signInWithRedirect(provider).then(function() {
+      // After redirect, onAuthStateChanged will handle the result
+    }).catch(function(redirectError) {
+      loginError.style.display = 'block';
+      loginError.textContent = 'Login failed: ' + redirectError.message;
+    });
+  });
+});
 
 /* ---------- Start ---------- */
 load();
