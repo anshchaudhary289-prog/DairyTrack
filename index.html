@@ -709,6 +709,15 @@ var authUnsubscribe = firebase.auth().onAuthStateChanged(function(user) {
     }
   }
 });
+// Handle redirect result on page load
+firebase.auth().getRedirectResult().then(function(result) {
+  // If user was redirected and signed in, onAuthStateChanged will handle it
+}).catch(function(error) {
+  // Show error if redirect failed
+  var loginError = document.getElementById('loginError');
+  loginError.style.display = 'block';
+  loginError.textContent = 'Login failed: ' + error.message;
+});
 // Sync Setup Function
 function setupSync(user) {
   var syncStatus = document.getElementById('syncStatus');
@@ -725,9 +734,26 @@ function setupSync(user) {
     var remoteUpdatedAt = doc.data().updatedAt;
     var remoteUpdatedBy = doc.data().updatedBy;
     
-    // Update localStorage from remote
+    // Agar apni hi bheji hui copy wapas aayi hai toh ignore karein
+    if (JSON.stringify(remoteState) === JSON.stringify(state)) {
+      // Sirf sync status update karein, state mat badlein, render mat karein
+      var now = new Date();
+      if (doc.metadata.hasPendingWrites) {
+        syncStatus.textContent = '⏳ Bhej raha hai...';
+        syncStatus.className = 'sync-status offline';
+      } else if (remoteUpdatedAt.toMillis() < now - 300000) { // 5 min se purana
+        syncStatus.textContent = '📴 Offline — hisab phone me safe hai, net aate hi sync hoga';
+        syncStatus.className = 'sync-status offline';
+      } else {
+        syncStatus.textContent = '☐ Sab sync hai';
+        syncStatus.className = 'sync-status online';
+      }
+      return;
+    }
+    
+    // Update localStorage from remote (sirf originalPersist, Firestore me wapas nahi)
     state = remoteState;
-    persist();
+    originalPersist();
     
     // Update sync status
     var now = new Date();
@@ -744,8 +770,12 @@ function setupSync(user) {
       syncStatus.className = 'sync-status online';
     }
     
-    // Re-render current screen
-    if (window.go) go('home');
+    // Usi screen ko dobara render karein jo khuli hai (.on wali)
+    var activeScreen = document.querySelector('.screen.on');
+    if (activeScreen) {
+      var screenId = activeScreen.id.replace('scr-', '');
+      if (window.go && screenId) go(screenId);
+    }
   }, function(error) {
     console.error('Sync error: ', error);
     if (syncStatus) {
@@ -757,6 +787,8 @@ function setupSync(user) {
 
 function persistToFirestore() {
   if (!state) return;
+  var currentJSON = JSON.stringify(state);
+  if (lastSentJSON === currentJSON) return; // Same data already sent
   var email = firebase.auth().currentUser?.email || '';
   var docRef = firebase.firestore().collection('hisab').doc('main');
   docRef.set({
@@ -765,6 +797,7 @@ function persistToFirestore() {
     updatedBy: email
   }, { merge: false })
     .then(function() {
+      lastSentJSON = currentJSON; // Mark as sent
       // Success
     })
     .catch(function(error) {
@@ -783,6 +816,7 @@ function debouncedPersistToFirestore() {
 
 // Override the original persist() to also write to Firestore when logged in
 var originalPersist = persist;
+var lastSentJSON = null;
 function persist() {
   originalPersist();
   var user = firebase.auth().currentUser;
