@@ -295,7 +295,7 @@ firebase.initializeApp(firebaseConfig);
 firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 try {
   firebase.firestore().enablePersistence({ synchronizeTabs: true })
-    .catch(() => {/* offline chalega, phir sync hoga */}});
+    .catch(() => {/* offline chalega, phir sync hoga */});
 } catch (e) {/* Firestore persistence already set ya error */ }
 
 function uid(){ return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -678,14 +678,14 @@ var authUnsubscribe = firebase.auth().onAuthStateChanged(function(user) {
   var loginScreen = document.getElementById('scr-login');
   var loginError = document.getElementById('loginError');
   var logoutBtn = document.getElementById('logoutBtn');
-  var mainContent = document.querySelector('.wrap');
+  var mainContent = document.querySelector('main');
   
   if (!user) {
     // User not logged in - show only login screen, hide main app
     loginScreen.style.display = 'flex';
     loginError.style.display = 'none';
     logoutBtn.style.display = 'none';
-    main.style.display = 'none';
+    mainContent.style.display = 'none';
     // Remove any existing app navigation
     document.querySelectorAll('.screen:not(#scr-login)').forEach(function(s) { s.style.display = 'none'; });
   } else {
@@ -696,12 +696,12 @@ var authUnsubscribe = firebase.auth().onAuthStateChanged(function(user) {
       loginError.textContent = 'Ye account dairy wala nahi hai';
       loginScreen.style.display = 'flex';
       logoutBtn.style.display = 'none';
-      main.style.display = 'none';
+      mainContent.style.display = 'none';
     } else {
       // Correct account - show app
       loginScreen.style.display = 'none';
       logoutBtn.style.display = 'block';
-      main.style.display = 'block';
+      mainContent.style.display = 'block';
       // Initialize app - render home, etc.
       renderHome();
       // Setup sync after login
@@ -731,12 +731,12 @@ function setupSync(user) {
     
     // Update sync status
     var now = new Date();
-    var diffMinutes = (now - remoteUpdatedAt.toMillis) / 60000;
+    var diffMinutes = (now - remoteUpdatedAt.toMillis()) / 60000;
     
     if (doc.metadata.hasPendingWrites) {
       syncStatus.textContent = '⏳ Bhej raha hai...';
       syncStatus.className = 'sync-status offline';
-    } else if (remoteUpdatedAt.toMillis < now - 300000) { // 5 min se purana
+    } else if (remoteUpdatedAt.toMillis() < now - 300000) { // 5 min se purana
       syncStatus.textContent = '📴 Offline — hisab phone me safe hai, net aate hi sync hoga';
       syncStatus.className = 'sync-status offline';
     } else {
@@ -789,8 +789,7 @@ function persist() {
   if (user) {
     debouncedPersistToFirestore();
   }
-});
-});
+}
 
 // Logout Function
 function doLogout() {
@@ -847,3 +846,5 @@ renderHome();
 </script>
 </body>
 </html>
+
+
