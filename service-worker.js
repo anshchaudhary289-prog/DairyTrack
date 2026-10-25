@@ -2,7 +2,7 @@
    Note: app ka DATA is file me nahi hota — data hamesha browser ke
    localStorage me rehta hai. Ye worker sirf app ki files cache karta
    hai taaki bina internet ke bhi app khul jaye. */
-var CACHE = "dairytrack-v2";
+var CACHE = "dairytrack-v3";
 var FILES = [
   "./",
   "./index.html",

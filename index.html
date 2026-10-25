@@ -819,19 +819,9 @@ document.getElementById('googleLoginBtn').addEventListener('click', function() {
   var loginError = document.getElementById('loginError');
   loginError.style.display = 'none';
   
-  // Try signInWithPopup first
+  // Sign in with redirect only (no popup - desktop bhi kaam karega)
   var provider = new firebase.auth.GoogleAuthProvider();
-  firebase.auth().signInWithPopup(provider).then(function(result) {
-    // Login successful - onAuthStateChanged will handle the rest
-  }).catch(function(error) {
-    // Popup blocked or failed - try redirect
-    firebase.auth().signInWithRedirect(provider).then(function() {
-      // After redirect, onAuthStateChanged will handle the result
-    }).catch(function(redirectError) {
-      loginError.style.display = 'block';
-      loginError.textContent = 'Login failed: ' + redirectError.message;
-    });
-  });
+  firebase.auth().signInWithRedirect(provider);
 });
 
 /* ---------- Start ---------- */
