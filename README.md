@@ -1,6 +1,6 @@
 # 🥛 DairyTrack
 
-Apni bhains ke doodh ki bikri ka hisab-kitab rakhne ke liye ek chhota sa **PWA (Progressive Web App)** — koi server nahi, koi login nahi, koi kharcha nahi. Saara data phone ke browser me hi rehta hai.
+Apni bhains ke doodh ki bikri ka hisab-kitab rakhne ke liye ek chhota sa **PWA (Progressive Web App)** — koi login ya server nahi, koi kharcha nahi. App public hai; har user ka data uske apne browser me localStorage me rehta hai. Data users/devices ke beech automatically share nahi hota.
 
 ## Kya-kya hota hai isme
 
@@ -26,7 +26,7 @@ Phone ke Chrome me link kholo → **📲 Install Karo** button (ya Chrome menu �
 ## Tech
 
 - Ek hi `index.html` me poora app (HTML + CSS + vanilla JS) — koi framework nahi, koi build step nahi.
-- Data: browser `localStorage` (key `doodhHisabV3`). Koi data kahi upload nahi hota.
+- Data: browser `localStorage` (key `doodhHisabV3`). Koi data kahi upload nahi hota. Har browser/device ka data alag hota hai; device badalne se pehle Backup / Restore use karein.
 - `manifest.json` + `service-worker.js` = installable PWA, offline-first.
 
 ## Aage ka plan (roadmap)
@@ -37,4 +37,4 @@ Phone ke Chrome me link kholo → **📲 Install Karo** button (ya Chrome menu �
 
 ## License
 
-Personal use ke liye banaya gaya hai.
+Personal use ke liye banaya gaya hai. Public demo ke liye Firebase authentication aur cloud sync hata diye gaye hain.
