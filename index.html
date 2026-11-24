@@ -314,7 +314,7 @@ function seed(){
 }
 var storageOK=true;
 try{ localStorage.setItem("__dh_test","1"); localStorage.removeItem("__dh_test"); }catch(e){ storageOK=false; }
-function load(){ if(storageOK){ try{ var raw=localStorage.getItem(LS_KEY); if(raw){ state=JSON.parse(raw); return; } }catch(e){} } state=seed(); persist(); }
+function load(){ if(storageOK){ try{ var raw=localStorage.getItem(LS_KEY); if(raw){ state=JSON.parse(raw); return; } }catch(e){ /* kharab save hua hisab: seed se overwrite karne se pehle uska backup rakho, taaki purana hisab chupchaap na mite */ try{ if(raw) localStorage.setItem(LS_KEY+".corrupt-"+Date.now(), raw); }catch(e2){} setTimeout(function(){ toast("⚠ Purana hisab kharab mila — backup me save karke naya hisab shuru kiya"); }, 300); } } state=seed(); persist(); }
 function persist(){ if(!storageOK) return; try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); }catch(e){} }
 function findCust(id){ for(var i=0;i<state.customers.length;i++) if(state.customers[i].id===id) return state.customers[i]; return null; }
 function activeCusts(){ return state.customers.filter(function(c){ return c.active; }); }
